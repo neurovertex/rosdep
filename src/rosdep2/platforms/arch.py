@@ -35,13 +35,16 @@ from .source import SOURCE_INSTALLER
 
 ARCH_OS_NAME = 'arch'
 PACMAN_INSTALLER = 'pacman'
+YAOURT_INSTALLER = 'yaourt'
 
 def register_installers(context):
     context.set_installer(PACMAN_INSTALLER, PacmanInstaller())
+    context.set_installer(YAOURT_INSTALLER, YaourtInstaller())
     
 def register_platforms(context):
     context.add_os_installer_key(ARCH_OS_NAME, SOURCE_INSTALLER)
     context.add_os_installer_key(ARCH_OS_NAME, PACMAN_INSTALLER)
+    context.add_os_installer_key(ARCH_OS_NAME, YAOURT_INSTALLER)
     context.set_default_os_installer_key(ARCH_OS_NAME, PACMAN_INSTALLER)
 
 def pacman_detect_single(p):
@@ -49,6 +52,12 @@ def pacman_detect_single(p):
 
 def pacman_detect(packages):
     return [p for p in packages if pacman_detect_single(p)]
+
+def yaourt_detect_single(p):
+    return not subprocess.call(['yaourt', '-Q', p], stdout=subprocess.PIPE, stderr=subprocess.PIPE)    
+
+def yaourt_detect(packages):
+    return [p for p in packages if yaourt_detect_single(p)]
 
 class PacmanInstaller(PackageManagerInstaller):
 
@@ -62,3 +71,15 @@ class PacmanInstaller(PackageManagerInstaller):
             return []
         else:
             return [self.elevate_priv(['pacman', '-Sy', '--needed', p]) for p in packages]
+
+class YaourtInstaller(PackageManagerInstaller):
+
+    def __init__(self):
+        super(YaourtInstaller, self).__init__(yaourt_detect)
+
+    def get_install_command(self, resolved, interactive=True, reinstall=False, quiet=False):
+        packages = self.get_packages_to_install(resolved, reinstall=reinstall)        
+        if not packages:
+            return []
+        else:
+            return [self.elevate_priv(['yaourt', '-S', '--needed', p]) for p in packages]
